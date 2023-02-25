@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.ComponentModel;
 using System.Data;
 using System.Drawing;
+using System.Globalization;
 using System.IO;
 using System.IO.Compression;
 using System.Linq;
@@ -16,7 +17,7 @@ namespace xopp_Merger
 {
     public partial class xoppFileMerger : Form
     {
-        string[] fileNamesToMerge;
+        //string[] fileNamesToMerge;
         string mergedFileName;
 
         public xoppFileMerger()
@@ -26,32 +27,47 @@ namespace xopp_Merger
 
         private void button1_Click(object sender, EventArgs e)
         {
+            // Choose Files to Merge
             OpenFileDialog openFileDialog = new OpenFileDialog();
             openFileDialog.Multiselect = true;
             openFileDialog.Filter = "Xournal++ file (*.xopp)|*.xopp";
 
             if (openFileDialog.ShowDialog() == DialogResult.OK)
             {
-                fileNamesToMerge = openFileDialog.FileNames;
-                foreach (string fileName in fileNamesToMerge)
+                //fileNamesToMerge = openFileDialog.FileNames;
+                foreach (string fileName in openFileDialog.FileNames/*fileNamesToMerge*/)
                 {
                     treeView1.Nodes.Add(new TreeNode(fileName));
                 }
             }
         }
 
+        private void button2_Click(object sender, EventArgs e)
+        {
+            // Clear
+            treeView1.Nodes.Clear();
+            progressBar1.Value = 0;
+        }
+
         private void button3_Click(object sender, EventArgs e)
         {
+            // Check if any files were selected
+            if (treeView1.Nodes == null || treeView1.Nodes.Count == 0)
+            {
+                MessageBox.Show("No files were selected!");
+                return;
+            }
+
             string tempPath = Path.GetTempPath();
             DirectoryInfo tempFolder = Directory.CreateDirectory(tempPath + "/xoppFileMerger/"); // create temp folder
 
             string mergedXmlString = "";
 
-            progressBar1.Maximum = fileNamesToMerge.Length + 1; // Set number of steps as max value of progress
+            progressBar1.Maximum = treeView1.Nodes.Count + 1; // Set number of steps as max value of progress
 
-            for (int i = 0; i < fileNamesToMerge.Length; i++)
+            for (int i = 0; i < treeView1.Nodes.Count; i++)
             {
-                string fileName = fileNamesToMerge[i];
+                string fileName = treeView1.Nodes[i].Text;
 
                 // Store a copy of the files in the temp folder
                 string tempFileName = tempFolder.FullName + Path.GetFileName(fileName);
@@ -86,9 +102,10 @@ namespace xopp_Merger
                             resultStream.Seek(0, SeekOrigin.Begin);
                             string xmlString = streamReader.ReadToEnd();
 
-                            // Remove first 4 lines and ending tag
-                            var lines = Regex.Split(xmlString, "\r\n|\r|\n").Skip(4);
-                            xmlString = string.Join(Environment.NewLine, lines.ToArray());
+                            // Remove starting tags and ending tag
+                            var lines = Regex.Split(xmlString, "\r\n|\r|\n");
+                            lines = lines.Where(line => !Regex.IsMatch(line, "\\<\\?xml.*\\?\\>|\\<xournal.*\\>|\\<title\\>.*\\<\\/title\\>|\\<preview\\>.*\\<\\/preview\\>")).ToArray();
+                            xmlString = string.Join("\n", lines);
                             xmlString = xmlString.Replace("</xournal>", "");
 
                             // Append to the output string
@@ -140,5 +157,6 @@ namespace xopp_Merger
             }
             tempFolder.Delete();
         }
+
     }
 }
